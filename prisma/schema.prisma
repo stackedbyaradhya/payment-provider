@@ -1,0 +1,144 @@
+// Payment Provider data model.
+// The domain layer never imports this client; repositories in `infrastructure/`
+// map between Prisma rows and domain entities.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  cards            Card[]
+  transactions     Transaction[]
+  refreshTokens    RefreshToken[]
+  idempotencyKeys  IdempotencyKey[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  revokedAt DateTime? @map("revoked_at")
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model CardVault {
+  id          String   @id @default(uuid()) @db.Uuid
+  ciphertext  Bytes
+  iv          Bytes
+  authTag     Bytes    @map("auth_tag")
+  keyVersion  Int      @map("key_version")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  card Card?
+
+  @@map("card_vault")
+}
+
+model Card {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  token           String    @unique
+  brand           String
+  last4           String    @db.Char(4)
+  expMonth        Int       @map("exp_month")
+  expYear         Int       @map("exp_year")
+  cardholderName  String    @map("cardholder_name")
+  vaultId         String    @unique @map("vault_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vault        CardVault     @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId, deletedAt])
+  @@map("cards")
+}
+
+enum TransactionStatus {
+  INITIATED
+  PROCESSING
+  RETRYING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+}
+
+model Transaction {
+  id                String            @id @default(uuid()) @db.Uuid
+  userId            String            @map("user_id") @db.Uuid
+  cardId            String            @map("card_id") @db.Uuid
+  amountMinor       BigInt            @map("amount_minor")
+  currency          String            @db.Char(3)
+  description       String?
+  status            TransactionStatus
+  authorizationCode String?           @map("authorization_code")
+  errorCode         String?           @map("error_code")
+  errorMessage      String?           @map("error_message")
+  attempts          Int               @default(0)
+  correlationId     String            @map("correlation_id")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card           Card                @relation(fields: [cardId], references: [id])
+  events         TransactionEvent[]
+  idempotencyKey IdempotencyKey?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("transactions")
+}
+
+model TransactionEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  transactionId String   @map("transaction_id") @db.Uuid
+  fromState     String?  @map("from_state")
+  toState       String   @map("to_state")
+  reason        String
+  metadata      Json?
+  correlationId String   @map("correlation_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId, createdAt])
+  @@map("transaction_events")
+}
+
+model IdempotencyKey {
+  userId         String   @map("user_id") @db.Uuid
+  key            String
+  requestHash    String   @map("request_hash")
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  transactionId  String?  @unique @map("transaction_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+  expiresAt      DateTime @map("expires_at")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@id([userId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
