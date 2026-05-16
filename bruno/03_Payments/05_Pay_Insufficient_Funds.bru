@@ -1,0 +1,52 @@
+meta {
+  name: Pay - INSUFFICIENT_FUNDS (FAILED, 1 attempt)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/payments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Idempotency-Key: {{idemKey}}
+}
+
+body:json {
+  {
+    "cardToken": "{{cardToken}}",
+    "amountMinor": 100,
+    "currency": "USD",
+    "description": "::INSUFFICIENT_FUNDS"
+  }
+}
+
+script:pre-request {
+  const uuid =
+    (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+    "idem-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+  bru.setEnvVar("idemKey", uuid);
+}
+
+docs {
+  Requires MOCK_BANK_DETERMINISTIC=true. The mock bank reads the trailing
+  ::OUTCOME off the description and forces the matching failure.
+  INSUFFICIENT_FUNDS is non-retryable, so attempts=1 and we never enter
+  RETRYING.
+}
+
+tests {
+  test("FAILED, INSUFFICIENT_FUNDS, single attempt (no retries)", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().status).to.equal("FAILED");
+    expect(res.getBody().errorCode).to.equal("INSUFFICIENT_FUNDS");
+    expect(res.getBody().attempts).to.equal(1);
+  });
+}

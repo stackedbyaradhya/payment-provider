@@ -1,0 +1,59 @@
+meta {
+  name: Pay - NETWORK_TIMEOUT exhausts retries (4 attempts)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/payments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Idempotency-Key: {{idemKey}}
+}
+
+body:json {
+  {
+    "cardToken": "{{cardToken}}",
+    "amountMinor": 100,
+    "currency": "USD",
+    "description": "::NETWORK_TIMEOUT"
+  }
+}
+
+script:pre-request {
+  const uuid =
+    (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+    "idem-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+  bru.setEnvVar("idemKey", uuid);
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setEnvVar("retryPaymentId", res.getBody().id);
+  }
+}
+
+docs {
+  Requires MOCK_BANK_DETERMINISTIC=true. NETWORK_TIMEOUT is retryable, so
+  the service runs the initial attempt + 3 retries with exponential backoff
+  and jitter, then gives up with status=FAILED. The next request reads the
+  state event history to prove the three RETRYING transitions actually
+  happened (audit trail, not just a counter).
+}
+
+tests {
+  test("FAILED with attempts=4 and errorCode=NETWORK_TIMEOUT", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().status).to.equal("FAILED");
+    expect(res.getBody().errorCode).to.equal("NETWORK_TIMEOUT");
+    expect(res.getBody().attempts).to.equal(4);
+  });
+}

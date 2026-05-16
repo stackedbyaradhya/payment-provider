@@ -1,0 +1,42 @@
+script:pre-request {
+  // One-shot per-run setup. We generate a unique demo user and a stable
+  // password the first time any request runs, then reuse them across the
+  // whole collection so Register and Login agree.
+  if (!bru.getEnvVar("demoEmail")) {
+    bru.setEnvVar("demoEmail", "demo-" + Date.now() + "@example.com");
+  }
+  if (!bru.getEnvVar("demoPassword")) {
+    bru.setEnvVar("demoPassword", "DemoPass123!QA");
+  }
+
+  // Friendly guard for running an authed request standalone before the
+  // Register/Login script has populated `accessToken`. Without this, the
+  // server just sees a missing Authorization header and returns a generic
+  // 401, which is confusing in a demo. Same for `cardToken` (set by Add
+  // Card) and the payment-history request (set by the Network Timeout test).
+  const url = req.getUrl();
+  const pathMatches = function (p) {
+    const i = url.indexOf(p);
+    if (i < 0) return false;
+    const next = url[i + p.length];
+    return next === undefined || next === "/" || next === "?";
+  };
+  const needsAccess = ["/me", "/cards", "/payments"].some(pathMatches);
+  if (needsAccess && !bru.getEnvVar("accessToken")) {
+    throw new Error(
+      "accessToken is empty. Run 01_Auth/01_Register (or 02_Login) first, " +
+      "or use 'Run collection' to execute everything in order."
+    );
+  }
+  const needsCard = pathMatches("/payments") && req.getMethod() === "POST";
+  if (needsCard && !bru.getEnvVar("cardToken")) {
+    throw new Error(
+      "cardToken is empty. Run 02_Cards/02_Add_Card before any /payments request."
+    );
+  }
+  if (url.indexOf("{{retryPaymentId}}") >= 0 && !bru.getEnvVar("retryPaymentId")) {
+    throw new Error(
+      "retryPaymentId is empty. Run 03_Payments/06_Pay_Network_Timeout_Retries first."
+    );
+  }
+}

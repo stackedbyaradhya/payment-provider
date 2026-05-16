@@ -1,0 +1,53 @@
+meta {
+  name: Pay - happy path (CAPTURED)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/payments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Idempotency-Key: {{idemKey}}
+}
+
+body:json {
+  {
+    "cardToken": "{{cardToken}}",
+    "amountMinor": 2599,
+    "currency": "USD",
+    "description": "tee shirt"
+  }
+}
+
+script:pre-request {
+  // Generate a fresh idempotency key for this run and store it so the next
+  // two requests (replay-same and replay-conflict) can reuse it.
+  const uuid =
+    (typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID()) ||
+    "idem-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+  bru.setEnvVar("idemKey", uuid);
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setEnvVar("paymentId", res.getBody().id);
+  }
+}
+
+tests {
+  test("201 with status=CAPTURED, attempts=1", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().status).to.equal("CAPTURED");
+    expect(res.getBody().attempts).to.equal(1);
+    expect(res.getBody().authorizationCode).to.match(/^[0-9A-F]{8}$/);
+  });
+}

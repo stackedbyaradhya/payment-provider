@@ -1,0 +1,19 @@
+meta {
+  name: Service Root
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/
+  body: none
+  auth: none
+}
+
+tests {
+  test("200 with service map", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("service");
+    expect(res.getBody()).to.have.property("docs");
+  });
+}

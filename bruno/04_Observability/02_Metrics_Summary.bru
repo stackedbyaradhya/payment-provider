@@ -1,0 +1,21 @@
+meta {
+  name: Metrics Summary (JSON)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/metrics/summary
+  body: none
+  auth: none
+}
+
+tests {
+  test("totals + success rate + avg latency", function () {
+    expect(res.getStatus()).to.equal(200);
+    const b = res.getBody();
+    expect(b).to.have.property("totalTransactions");
+    expect(b).to.have.property("successRate");
+    expect(b).to.have.property("avgPaymentDurationSeconds");
+  });
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Correlation-Id round-trip
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/cards
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  X-Correlation-Id: demo-trace-{{$timestamp}}
+}
+
+tests {
+  test("response echoes the supplied correlation id", function () {
+    expect(res.getStatus()).to.equal(200);
+    const sent = req.getHeader("X-Correlation-Id");
+    expect(res.getHeader("x-correlation-id")).to.equal(sent);
+  });
+}

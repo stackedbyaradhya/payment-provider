@@ -1,0 +1,28 @@
+meta {
+  name: Get payment - full state event history
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/payments/{{retryPaymentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("200 with state event audit trail", function () {
+    expect(res.getStatus()).to.equal(200);
+    const events = res.getBody().events;
+    expect(events).to.be.an("array").and.to.have.length.greaterThan(0);
+    const states = events.map(function (e) { return e.toState; });
+    // Should pass through PROCESSING, hit RETRYING 3 times, end at FAILED.
+    expect(states).to.include("PROCESSING");
+    expect(states.filter(function (s) { return s === "RETRYING"; })).to.have.length(3);
+    expect(states[states.length - 1]).to.equal("FAILED");
+  });
+}

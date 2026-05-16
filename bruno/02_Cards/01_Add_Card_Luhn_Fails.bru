@@ -1,0 +1,41 @@
+meta {
+  name: Add Card - Luhn fails
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/cards
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "number": "4111111111111112",
+    "expMonth": 12,
+    "expYear": 2030,
+    "cardholderName": "AJ Demo"
+  }
+}
+
+tests {
+  test("422 VALIDATION_ERROR with Luhn-specific message", function () {
+    // 422 (Unprocessable Entity): the JSON is well-formed, but the value fails
+    // business validation (Luhn checksum). 400 is reserved for malformed input.
+    expect(res.getStatus()).to.equal(422);
+    expect(res.getBody().code).to.equal("VALIDATION_ERROR");
+    expect(res.getBody().message.toLowerCase()).to.match(/luhn|card number/);
+  });
+  test("no PAN echoed in the error body", function () {
+    expect(JSON.stringify(res.getBody())).to.not.include("4111111111111112");
+  });
+}

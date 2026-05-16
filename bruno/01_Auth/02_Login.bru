@@ -1,0 +1,36 @@
+meta {
+  name: Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{demoEmail}}",
+    "password": "{{demoPassword}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("accessToken", res.getBody().tokens.accessToken);
+    bru.setEnvVar("refreshToken", res.getBody().tokens.refreshToken);
+  }
+}
+
+tests {
+  test("200 with fresh tokens", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().tokens.accessToken).to.be.a("string");
+  });
+}

@@ -1,0 +1,37 @@
+meta {
+  name: Replay - same key, same body (idempotent)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/payments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+  Idempotency-Key: {{idemKey}}
+}
+
+body:json {
+  {
+    "cardToken": "{{cardToken}}",
+    "amountMinor": 2599,
+    "currency": "USD",
+    "description": "tee shirt"
+  }
+}
+
+tests {
+  test("returns the same transaction id, no new payment created", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().id).to.equal(bru.getEnvVar("paymentId"));
+    expect(res.getBody().status).to.equal("CAPTURED");
+  });
+}

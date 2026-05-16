@@ -1,0 +1,47 @@
+meta {
+  name: Add Card (valid Visa test PAN)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/cards
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "number": "4111111111111111",
+    "expMonth": 12,
+    "expYear": 2030,
+    "cardholderName": "AJ Demo"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setEnvVar("cardToken", res.getBody().token);
+  }
+}
+
+tests {
+  test("201 with opaque tok_* token", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().token).to.match(/^tok_/);
+  });
+  test("only brand + last4 + expiry returned, never the PAN", function () {
+    const body = res.getBody();
+    expect(body.brand).to.equal("VISA");
+    expect(body.last4).to.equal("1111");
+    expect(JSON.stringify(body)).to.not.include("4111111111111111");
+  });
+}

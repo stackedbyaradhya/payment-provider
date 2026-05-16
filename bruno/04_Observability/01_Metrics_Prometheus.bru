@@ -1,0 +1,21 @@
+meta {
+  name: Metrics (Prometheus text)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/metrics
+  body: none
+  auth: none
+}
+
+tests {
+  test("200 with prom-client exposition", function () {
+    expect(res.getStatus()).to.equal(200);
+    const body = res.getBody();
+    const text = typeof body === "string" ? body : JSON.stringify(body);
+    expect(text).to.include("payments_total");
+    expect(text).to.include("bank_attempts_total");
+  });
+}

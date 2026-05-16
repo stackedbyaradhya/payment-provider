@@ -1,0 +1,26 @@
+meta {
+  name: List Cards
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/cards
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("200 with at least one card", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.be.an("array").and.to.have.length.greaterThan(0);
+  });
+  test("no card returns its full PAN", function () {
+    const blob = JSON.stringify(res.getBody());
+    expect(blob).to.not.match(/\b\d{13,19}\b/);
+  });
+}

@@ -1,0 +1,43 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "{{demoEmail}}",
+    "password": "{{demoPassword}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setEnvVar("accessToken", res.getBody().tokens.accessToken);
+    bru.setEnvVar("refreshToken", res.getBody().tokens.refreshToken);
+    bru.setEnvVar("userId", res.getBody().user.id);
+  }
+}
+
+tests {
+  test("201 with user + tokens", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().user).to.have.property("id");
+    expect(res.getBody().tokens).to.have.property("accessToken");
+    expect(res.getBody().tokens).to.have.property("refreshToken");
+  });
+  test("password is not echoed back", function () {
+    const body = JSON.stringify(res.getBody());
+    expect(body).to.not.include("DemoPass123");
+  });
+}

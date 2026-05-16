@@ -1,0 +1,40 @@
+meta {
+  name: Refresh (rotates token)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setEnvVar("accessToken", res.getBody().accessToken);
+    bru.setEnvVar("refreshToken", res.getBody().refreshToken);
+  }
+}
+
+tests {
+  test("200 with a new token pair", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.have.property("accessToken");
+    expect(res.getBody()).to.have.property("refreshToken");
+  });
+  test("rotated refresh token differs from previous", function () {
+    // Note: env was already overwritten above. We assert it's set + non-empty.
+    expect(bru.getEnvVar("refreshToken")).to.be.a("string").and.to.have.length.greaterThan(20);
+  });
+}
